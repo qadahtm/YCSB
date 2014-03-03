@@ -55,12 +55,14 @@
     <voldemort.version>0.81</voldemort.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <thrift.version>0.8.0</thrift.version>
+    <spymemcached.version>2.10.3</spymemcached.version>
     <hypertable.version>0.9.5.6</hypertable.version>
   </properties>
 
   <modules>
     <!--module>build-tools</module-->
     <module>cassandra</module>
+    <module>memcached</module>
     <module>core</module>
     <module>hbase</module>
     <module>hypertable</module>
@@ -77,6 +79,20 @@
     <module>voldemort</module>
     <module>distribution</module>
   </modules>
+  
+  
+  <repositories>
+    <repository>
+      <id>spy</id>
+      <name>Spy Repository</name>
+      <layout>default</layout>
+      <url>http://files.couchbase.com/maven2/</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+  
 
   <build>
     <plugins>
