@@ -12,6 +12,9 @@ import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 
+import org.codehaus.jackson.*;
+import org.codehaus.jackson.map.ObjectMapper;
+
 import com.yahoo.ycsb.DBException;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.ByteArrayByteIterator;
@@ -35,27 +38,56 @@ public class Memcached extends com.yahoo.ycsb.DB
    * there is one DB instance per client thread.
    */
   public void init() throws DBException {
-   /* I removed this code and add the try after it to create a connection to memcached manualy
-    * String server = props.getProperty("memcached.server");
-    int port = 11211;
+	  
+	  // Loading properties from the file
+	props = getProperties();
+	
+	// getting the server list in JSON format
+    String serversList = props.getProperty("serverslist");
+    
+    if (serversList == null)
+      throw new DBException("serverslist param must be specified in JSON format");
 
-    if (server == null)
-      throw new DBException("memcached.server param must be specified");
-
-    try { port = Integer.parseInt(props.getProperty("memcached.port")); }
-    catch (Exception e) {}
-
+  
     try {
-      client = new MemcachedClient(new InetSocketAddress(server, port));
-    } catch (IOException e) { throw new DBException(e); }
+    	
+    	  ObjectMapper mapper = new ObjectMapper();
+    	  
+    	  JsonParser jp = mapper.getJsonFactory().createJsonParser(serversList);
+    	  JsonNode root = mapper.readTree(jp);
+    	  
+    	  System.out.println(root.toString());
+    	  ArrayList<InetSocketAddress> mcservers = new ArrayList<InetSocketAddress>();
+    	  
+    	  // Create server entries according to multiplier value. 
+    	  for (JsonNode server : root.path("servers")) {
+    		    String ip = server.get("ip").asText();
+    		    int port = server.get("port").asInt();
+    		    int mul = server.get("multiplier").asInt();
+    		    
+    		    for (int i = 0; i < mul; i++){
+    		    	mcservers.add(new InetSocketAddress(ip,port));	
+    		    }    		    
+    	  }
+    	  
+    	  for (InetSocketAddress s : mcservers){
+    		  System.out.printf("%s %d \n", s.getHostName(),s.getPort());   		   
+    	  }
+    	  
+    	  
+      client = new MemcachedClient(mcservers);
+    	  
+    	  
+    } catch (IOException e) { 
+    	throw new DBException(e); 
+    
+    }
 
-    * 
-    */
-	  try {
-	      client = new MemcachedClient(AddrUtil.getAddresses("128.46.122.52:11211 128.46.122.53:11211 128.46.122.153:11211"));
-	    } catch (IOException e) { throw new DBException(e); }
+//	  try {
+//	      client = new MemcachedClient(AddrUtil.getAddresses("128.46.122.52:11211 128.46.122.53:11211 128.46.122.153:11211"));
+//	    } catch (IOException e) { throw new DBException(e); }
 
-      }
+    }
 
   /**
    * Cleanup any state for this DB.  Called once per DB instance;
