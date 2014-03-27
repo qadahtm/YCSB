@@ -128,6 +128,8 @@ public class Memcached extends com.yahoo.ycsb.DB
     HashMap<String, byte[]> values = 
       (HashMap<String, byte[]>) client.get(table + ":" + key);
     
+    client.updateStats(client.GET, key);	
+    
     if (values == null) return NOT_FOUND;
     if (values.keySet().isEmpty()) return NOT_FOUND;
     if (fields == null) fields = values.keySet();
@@ -190,7 +192,7 @@ public class Memcached extends com.yahoo.ycsb.DB
 
     try { 
     	int res = f.get() ? OK : ERROR;
-    	client.updateStats(key);		
+    	client.updateStats(client.SET, key);		
     	return res; }
     catch (InterruptedException e) { return ERROR; }
     catch (ExecutionException e) { return ERROR; }

@@ -20,7 +20,11 @@ import net.spy.memcached.MemcachedNode;
 
 public class MemcachedClientWithKeyStats extends MemcachedClient{
 	
+	final static int GET = 0;
+	final static int SET = 1;
+	
 	HashMap<InetSocketAddress,Integer> keyCount = new HashMap<InetSocketAddress,Integer>();
+	HashMap<InetSocketAddress,Integer> keyCount_read = new HashMap<InetSocketAddress,Integer>();
 	
 	public MemcachedClientWithKeyStats(ConnectionFactory cf, List<InetSocketAddress> addrs)
 			throws IOException {
@@ -50,18 +54,25 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 	}
 	
 	
-	public void updateStats(String key){
-		int count = keyCount.get((InetSocketAddress)this.getHashedServer(key).getSocketAddress());
-		count++;
-		keyCount.put((InetSocketAddress)this.getHashedServer(key).getSocketAddress(),count);
+	public void updateStats(int m, String key){
+		if (m == SET){
+			int count = keyCount.get((InetSocketAddress)this.getHashedServer(key).getSocketAddress());
+			count++;
+			keyCount.put((InetSocketAddress)this.getHashedServer(key).getSocketAddress(),count);
+		}
+		else if (m == GET){
+			int count = keyCount_read.get((InetSocketAddress)this.getHashedServer(key).getSocketAddress());
+			count++;
+			keyCount_read.put((InetSocketAddress)this.getHashedServer(key).getSocketAddress(),count);
+		}
+		
 	}
 	
 	public void printStats(){
-		Collection<MemcachedNode> mns = super.mconn.getLocator().getAll();
-		System.out.printf("Host \t\t keyCount \n");
-		for (MemcachedNode mn : mns){
-			InetSocketAddress a = ((InetSocketAddress) mn.getSocketAddress());				
-			System.out.printf("%s \t\t %d \n",a.getHostName(),keyCount.get(a));
+		System.out.printf("Host \t\t keyCount \t\t keyCount_read \n");
+		
+		for (InetSocketAddress a : keyCount.keySet()){
+			System.out.printf("%s \t\t %d \t\t %d\n",a.getHostName(),keyCount.get(a),keyCount_read.get(a));
 		}
 	}
 	
