@@ -20,18 +20,31 @@ import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.ByteArrayByteIterator;
 import com.yahoo.ycsb.StringByteIterator;
 
-import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.internal.OperationFuture;
 import net.spy.memcached.AddrUtil;
 
 public class Memcached extends com.yahoo.ycsb.DB
 {
-  MemcachedClient client;
+  MemcachedClientWithKeyStats client;
   Properties props;
+  int fliedlength = 0;
 
   public static final int OK = 0;
   public static final int ERROR = -1;
   public static final int NOT_FOUND = -2;
+  
+  final static String chars = "abcdefghijklmnopqrstuvwxyz";
+	static String buildAString(int size){
+		
+		StringBuilder sb = new StringBuilder();
+		for (int i=0;i< size;++i){
+			int j = (int) Math.floor(Math.random()*chars.length());
+			sb.append(chars.charAt(j));
+		}
+		return sb.toString();		
+	}
+	
+	
 
   /**
    * Initialize any state for this DB.  Called once per DB instance;
@@ -44,6 +57,7 @@ public class Memcached extends com.yahoo.ycsb.DB
 	
 	// getting the server list in JSON format
     String serversList = props.getProperty("serverslist");
+    this.fliedlength = Integer.parseInt(props.getProperty("fieldlength")); 
     
     if (serversList == null)
       throw new DBException("serverslist param must be specified in JSON format");
@@ -56,7 +70,7 @@ public class Memcached extends com.yahoo.ycsb.DB
     	  JsonParser jp = mapper.getJsonFactory().createJsonParser(serversList);
     	  JsonNode root = mapper.readTree(jp);
     	  
-    	  System.out.println(root.toString());
+//    	  System.out.println(root.toString());
     	  ArrayList<InetSocketAddress> mcservers = new ArrayList<InetSocketAddress>();
     	  
     	  // Create server entries according to multiplier value. 
@@ -75,7 +89,7 @@ public class Memcached extends com.yahoo.ycsb.DB
     	  }
     	  
     	  
-      client = new MemcachedClient(mcservers);
+      client = new MemcachedClientWithKeyStats(mcservers);
     	  
     	  
     } catch (IOException e) { 
@@ -95,6 +109,7 @@ public class Memcached extends com.yahoo.ycsb.DB
    */
   public void cleanup() throws DBException
   {
+	  client.printStats();
    client.shutdown();
   }
 
@@ -112,7 +127,7 @@ public class Memcached extends com.yahoo.ycsb.DB
                   HashMap<String,ByteIterator> result) {
     HashMap<String, byte[]> values = 
       (HashMap<String, byte[]>) client.get(table + ":" + key);
-
+    
     if (values == null) return NOT_FOUND;
     if (values.keySet().isEmpty()) return NOT_FOUND;
     if (fields == null) fields = values.keySet();
@@ -160,15 +175,23 @@ public class Memcached extends com.yahoo.ycsb.DB
   public int update(String table, String key,
                     HashMap<String,ByteIterator> values) {
     HashMap<String, byte[]> new_values = new HashMap<String, byte[]>();
-
+   
     for (String k: values.keySet()) {
-      new_values.put(k, values.get(k).toArray());
+      	
+      byte[] vb = values.get(k).toArray();
+      new_values.put(k, vb);
+	  //sum += vb.length;
+	  //System.out.println(k+":-"+vb+"- , "+vb.length);
+      
     }
-
+    
     OperationFuture<Boolean> f =
       client.set(table + ":" + key, 3600, new_values);
 
-    try { return f.get() ? OK : ERROR; }
+    try { 
+    	int res = f.get() ? OK : ERROR;
+    	client.updateStats(key);		
+    	return res; }
     catch (InterruptedException e) { return ERROR; }
     catch (ExecutionException e) { return ERROR; }
   }
