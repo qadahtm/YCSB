@@ -31,6 +31,7 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 		super(cf, addrs);
 		for (InetSocketAddress a : addrs){
 			keyCount.put(a, 0);
+			keyCount_read.put(a,0);
 		}
 	}
 
@@ -38,6 +39,7 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 		super(ia);
 		for (InetSocketAddress a : ia){
 			keyCount.put(a, 0);
+			keyCount_read.put(a,0);
 		}
 	}
 
@@ -46,6 +48,7 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 		super(addrs);
 		for (InetSocketAddress a : addrs){
 			keyCount.put(a, 0);
+			keyCount_read.put(a,0);
 		}
 	}
 	
