@@ -1,9 +1,9 @@
+// Modified By: Thamir Qadah 2014
+//
+// Original:
 // Jacob Leverich <leverich@stanford.edu>, 2011
 // Memcached client for YCSB framework.
-//
-// Properties:
-//   memcached.server=memcached.xyz.com
-//   memcached.port=11211
+// 
 
 package com.yahoo.ycsb.db;
 
@@ -19,6 +19,7 @@ import com.yahoo.ycsb.DBException;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.ByteArrayByteIterator;
 import com.yahoo.ycsb.StringByteIterator;
+import com.yahoo.ycsb.measurements.Measurements;
 
 import net.spy.memcached.internal.OperationFuture;
 import net.spy.memcached.AddrUtil;
@@ -31,7 +32,9 @@ public class Memcached extends com.yahoo.ycsb.DB
 
   public static final int OK = 0;
   public static final int ERROR = -1;
-  public static final int NOT_FOUND = -2;
+  public static final int NOT_FOUND_V = -2; // Miss
+  public static final int NOT_FOUND_K = -3;
+  public static final int NOT_FOUND_SV = -4;
   
   final static String chars = "abcdefghijklmnopqrstuvwxyz";
 	static String buildAString(int size){
@@ -84,13 +87,13 @@ public class Memcached extends com.yahoo.ycsb.DB
     		    }    		    
     	  }
     	  
-    	  for (InetSocketAddress s : mcservers){
-    		  System.out.printf("%s %d \n", s.getHostName(),s.getPort());   		   
-    	  }
+//    	  for (InetSocketAddress s : mcservers){
+//    		  System.out.printf("%s %d \n", s.getHostName(),s.getPort());   		   
+//    	  }
     	  
     	  
       client = new MemcachedClientWithKeyStats(mcservers);
-    	  
+//      client.setMeasurements(Measurements.getMeasurements());  
     	  
     } catch (IOException e) { 
     	throw new DBException(e); 
@@ -123,20 +126,25 @@ public class Memcached extends com.yahoo.ycsb.DB
    * @param result A HashMap of field/value pairs for the result
    * @return Zero on success, a non-zero error code on error or "not found".
    */
-  public int read(String table, String key, Set<String> fields,
+  @SuppressWarnings("unchecked")
+public int read(String table, String key, Set<String> fields,
                   HashMap<String,ByteIterator> result) {
+	  long st=System.nanoTime();
     HashMap<String, byte[]> values = 
       (HashMap<String, byte[]>) client.get(table + ":" + key);
+    long en=System.nanoTime();
     
-    client.updateStats(client.GET, key);	
+    client.updateStats(client.GET, key);
     
-    if (values == null) return NOT_FOUND;
-    if (values.keySet().isEmpty()) return NOT_FOUND;
+	Measurements.getMeasurements().measure("Memcached:GET@"+client.getServerHostname(key), (int)((en-st)/1000));
+    
+    if (values == null) return NOT_FOUND_V;
+    if (values.keySet().isEmpty()) return NOT_FOUND_K;
     if (fields == null) fields = values.keySet();
 
     for (String k: fields) {
       byte[] v = values.get(k);
-      if (v == null) return NOT_FOUND;
+      if (v == null) return NOT_FOUND_SV;
       result.put(k, new ByteArrayByteIterator(v));
     }
 
@@ -177,22 +185,27 @@ public class Memcached extends com.yahoo.ycsb.DB
   public int update(String table, String key,
                     HashMap<String,ByteIterator> values) {
     HashMap<String, byte[]> new_values = new HashMap<String, byte[]>();
-   
+   int sum = 0;
     for (String k: values.keySet()) {
       	
       byte[] vb = values.get(k).toArray();
       new_values.put(k, vb);
-	  //sum += vb.length;
-	  //System.out.println(k+":-"+vb+"- , "+vb.length);
-      
+	  sum += vb.length;
+	  
     }
+//    System.out.println("Sum = "+sum);
     
+//    Measurements.getMeasurements().measure("DataSize", sum);
+//    Measurements.getMeasurements().measure("KeySize", key.getBytes().length);
     OperationFuture<Boolean> f =
       client.set(table + ":" + key, 3600, new_values);
 
     try { 
+  	  long st=System.nanoTime();
     	int res = f.get() ? OK : ERROR;
-    	client.updateStats(client.SET, key);		
+  	  long en=System.nanoTime();
+    	client.updateStats(client.SET, key);	
+    	Measurements.getMeasurements().measure("Memcached:SET@"+client.getServerHostname(key), (int)((en-st)/1000));
     	return res; }
     catch (InterruptedException e) { return ERROR; }
     catch (ExecutionException e) { return ERROR; }
