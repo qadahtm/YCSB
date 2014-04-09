@@ -105,10 +105,10 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 	
 	public void printStats(){
 		if (!this.ycsbm){
-			System.out.printf("Host \t\t keyCount \t\t keyCount_read \n");
+			System.out.printf("Host, keyCount, keyCount_read \n");
 
 			for (InetSocketAddress a : keyCount.keySet()){
-				System.out.printf("%s \t\t %d \t\t %d\n",a.getHostName(),keyCount.get(a),keyCount_read.get(a));
+				System.out.printf("%s, %d , %d\n",a.getHostName(),keyCount.get(a),keyCount_read.get(a));
 			}
 		}
 		
