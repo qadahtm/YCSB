@@ -129,6 +129,7 @@ public class Memcached extends com.yahoo.ycsb.DB
   @SuppressWarnings("unchecked")
 public int read(String table, String key, Set<String> fields,
                   HashMap<String,ByteIterator> result) {
+	  
 	  long st=System.nanoTime();
     HashMap<String, byte[]> values = 
       (HashMap<String, byte[]>) client.get(table + ":" + key);
@@ -138,16 +139,26 @@ public int read(String table, String key, Set<String> fields,
     
 	Measurements.getMeasurements().measure("Memcached:GET@"+client.getServerHostname(key), (int)((en-st)/1000));
     
-    if (values == null) return NOT_FOUND_V;
-    if (values.keySet().isEmpty()) return NOT_FOUND_K;
+    if (values == null){
+    	Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), NOT_FOUND_V);
+    	return NOT_FOUND_V;
+    }
+    if (values.keySet().isEmpty()){
+    	Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), NOT_FOUND_K);
+    	return NOT_FOUND_K;
+    }
     if (fields == null) fields = values.keySet();
 
     for (String k: fields) {
       byte[] v = values.get(k);
-      if (v == null) return NOT_FOUND_SV;
+      if (v == null){
+    	  Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), NOT_FOUND_SV);
+    	  return NOT_FOUND_SV;
+      }
       result.put(k, new ByteArrayByteIterator(v));
     }
-
+    
+    Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), OK);
     return OK;
   }
 
@@ -185,12 +196,12 @@ public int read(String table, String key, Set<String> fields,
   public int update(String table, String key,
                     HashMap<String,ByteIterator> values) {
     HashMap<String, byte[]> new_values = new HashMap<String, byte[]>();
-   int sum = 0;
+//   int sum = 0;
     for (String k: values.keySet()) {
       	
       byte[] vb = values.get(k).toArray();
       new_values.put(k, vb);
-	  sum += vb.length;
+//	  sum += vb.length;
 	  
     }
 //    System.out.println("Sum = "+sum);
@@ -204,11 +215,16 @@ public int read(String table, String key, Set<String> fields,
   	  long st=System.nanoTime();
     	int res = f.get() ? OK : ERROR;
   	  long en=System.nanoTime();
-    	client.updateStats(client.SET, key);	
+  	  client.updateStats(client.SET, key);	
     	Measurements.getMeasurements().measure("Memcached:SET@"+client.getServerHostname(key), (int)((en-st)/1000));
+    	Measurements.getMeasurements().reportReturnCode("Memcached:SET@"+client.getServerHostname(key), res);
     	return res; }
-    catch (InterruptedException e) { return ERROR; }
-    catch (ExecutionException e) { return ERROR; }
+    catch (InterruptedException e) {
+    	Measurements.getMeasurements().reportReturnCode("Memcached:SET@"+client.getServerHostname(key), ERROR);
+    	return ERROR; }
+    catch (ExecutionException e) {
+    	Measurements.getMeasurements().reportReturnCode("Memcached:SET@"+client.getServerHostname(key), ERROR);
+    	return ERROR; }
   }
 
   /**

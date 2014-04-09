@@ -22,18 +22,29 @@
 #   Default data size: 1 KB records (10 fields, 100 bytes each, plus key)
 #   Request distribution: zipfian
 
-serverslist={"servers":[{"ip":"128.46.122.50","port":11211,"multiplier":1},{"ip":"128.46.122.53","port":11211,"multiplier":2},{"ip":"128.46.122.153","port":11211,"multiplier":4}]}
-recordcount=1000
-operationcount=1000
+#serverslist={"servers":[{"ip":"128.46.122.50","port":11211,"multiplier":1},{"ip":"128.46.122.51","port":11211,"multiplier":1},{"ip":"128.46.122.52","port":11211,"multiplier":1},{"ip":"128.46.122.53","port":11211,"multiplier":1}]}
+serverslist={"servers":[{"ip":"128.46.122.50","port":11211,"multiplier":1},{"ip":"128.46.122.51","port":11211,"multiplier":1},{"ip":"128.46.122.52","port":11211,"multiplier":1}]}
+#serverslist={"servers":[{"ip":"128.46.122.50","port":11211,"multiplier":1},{"ip":"128.46.122.51","port":11211,"multiplier":2},{"ip":"128.46.122.52","port":11211,"multiplier":3}]}
+#serverslist={"servers":[{"ip":"128.46.122.50","port":11211,"multiplier":2},{"ip":"128.46.122.53","port":11211,"multiplier":3},{"ip":"128.46.122.153","port":11211,"multiplier":1}]}
+#serverslist={"servers":[{"ip":"128.46.122.53","port":11211,"multiplier":1}]}
+
+recordcount=100000
+operationcount=100000
 workload=com.yahoo.ycsb.workloads.CoreWorkload
 
+#insertorder=ordered
 
+#measurementtype=timeseries
+#timeseries.granularity=10
+
+fieldcount=10
+fieldlength=100
 readallfields=true
 
-readproportion=0.5
-updateproportion=0.5
+readproportion=1.0
+updateproportion=0
 scanproportion=0
 insertproportion=0
 
-requestdistribution=zipfian
+#requestdistribution=zipfian
 
