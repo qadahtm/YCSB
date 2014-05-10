@@ -1,3 +1,45 @@
+Author: Thamir Qadah
+
+Memcached DB Layer Implementation. 
+
+This work is done for the project component for ECE595 course at Purdue University. 
+
+We have extended the YCSB software to include a DB Layer for Memcached servers. This layer uses Spymemcached to 
+
+
+Building Instructions:
+
+Make sure that you have Git, Maven2 and Java installed.  Also, make sure that you have Internet connection as Maven will download the dependencies. 
+
+To download the project source:
+
+$ git clone https://github.com/qadahtm/YCSB-mc.git
+
+The source will be downloaded into a new directory “YCSB-mc”.
+
+Now,
+
+$ cd YCSB-mc
+
+Run the following command to build YCSB with the Memcached DB Layer only.
+
+$ mvn clean package -pl memcached -am
+
+Modify the workload file as desired. A sample is at ./workloads/workloada_mc
+
+Running a workload:
+
+Load Phase:
+
+bin/ycsb load memcached -P workloads/workloada_mc
+
+Run Phase:
+
+bin/ycsb run memcached -P workloads/workloada_mc
+
+
+Below is the Original README CONTENT
+
 Yahoo! Cloud System Benchmark (YCSB)
 ====================================
 

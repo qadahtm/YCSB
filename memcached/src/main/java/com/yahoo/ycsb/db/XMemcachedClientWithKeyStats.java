@@ -14,13 +14,14 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 
-import com.yahoo.ycsb.measurements.Measurements;
-
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 import net.spy.memcached.MemcachedNode;
 
-public class MemcachedClientWithKeyStats extends MemcachedClient{
+import com.yahoo.ycsb.measurements.Measurements;
+
+
+public class XMemcachedClientWithKeyStats extends MemcachedClient{
 	
 	final static int GET = 0;
 	final static int SET = 1;
@@ -30,7 +31,7 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 	HashMap<InetSocketAddress,Integer> keyCount = new HashMap<InetSocketAddress,Integer>();
 	HashMap<InetSocketAddress,Integer> keyCount_read = new HashMap<InetSocketAddress,Integer>();
 	
-	public MemcachedClientWithKeyStats(ConnectionFactory cf, List<InetSocketAddress> addrs)
+	public XMemcachedClientWithKeyStats(ConnectionFactory cf, List<InetSocketAddress> addrs)
 			throws IOException {
 		super(cf, addrs);
 		for (InetSocketAddress a : addrs){
@@ -39,7 +40,7 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 		}
 	}
 
-	public MemcachedClientWithKeyStats(InetSocketAddress... ia) throws IOException {
+	public XMemcachedClientWithKeyStats(InetSocketAddress... ia) throws IOException {
 		super(ia);
 		for (InetSocketAddress a : ia){
 			keyCount.put(a, 0);
@@ -47,7 +48,7 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 		}
 	}
 
-	public MemcachedClientWithKeyStats(List<InetSocketAddress> addrs)
+	public XMemcachedClientWithKeyStats(List<InetSocketAddress> addrs)
 			throws IOException {
 		super(addrs);
 		for (InetSocketAddress a : addrs){
@@ -62,7 +63,6 @@ public class MemcachedClientWithKeyStats extends MemcachedClient{
 	
 	public String getServerHostname(String key){
 		InetSocketAddress iadd = (InetSocketAddress)this.getHashedServer(key).getSocketAddress();
-		
 		return iadd.getHostName();
 	}
 	

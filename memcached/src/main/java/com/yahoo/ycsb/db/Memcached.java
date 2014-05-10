@@ -32,6 +32,8 @@ public class Memcached extends com.yahoo.ycsb.DB
 
   public static final int OK = 0;
   public static final int ERROR = -1;
+  public static final int ERROR_IE = -11;
+  public static final int ERROR_EE = -12;
   public static final int NOT_FOUND_V = -2; // Miss
   public static final int NOT_FOUND_K = -3;
   public static final int NOT_FOUND_SV = -4;
@@ -46,6 +48,12 @@ public class Memcached extends com.yahoo.ycsb.DB
 		}
 		return sb.toString();		
 	}
+	
+	HashMap<String,Integer> DistinctkeyCount = new HashMap<String,Integer>();
+    HashMap<String,HashMap<String,ArrayList<Integer>>> distinctKeyCountPerServer = new HashMap<String,HashMap<String,ArrayList<Integer>>>();
+    
+    HashMap<String,Integer> DistinctkeyCountR = new HashMap<String,Integer>();
+    HashMap<String,HashMap<String,ArrayList<Integer>>> distinctKeyCountPerServerR = new HashMap<String,HashMap<String,ArrayList<Integer>>>();
 	
 	
 
@@ -81,19 +89,22 @@ public class Memcached extends com.yahoo.ycsb.DB
     		    String ip = server.get("ip").asText();
     		    int port = server.get("port").asInt();
     		    int mul = server.get("multiplier").asInt();
-    		    
+    		    InetSocketAddress sa = new InetSocketAddress(ip,port);
     		    for (int i = 0; i < mul; i++){
-    		    	mcservers.add(new InetSocketAddress(ip,port));	
+    		    	mcservers.add(sa);	
     		    }    		    
+    		    distinctKeyCountPerServer.put(sa.getHostName(), new HashMap<String,ArrayList<Integer>>());
+    		    distinctKeyCountPerServerR.put(sa.getHostName(), new HashMap<String,ArrayList<Integer>>());
     	  }
     	  
 //    	  for (InetSocketAddress s : mcservers){
 //    		  System.out.printf("%s %d \n", s.getHostName(),s.getPort());   		   
 //    	  }
     	  
-    	  
       client = new MemcachedClientWithKeyStats(mcservers);
 //      client.setMeasurements(Measurements.getMeasurements());  
+      
+      
     	  
     } catch (IOException e) { 
     	throw new DBException(e); 
@@ -113,6 +124,65 @@ public class Memcached extends com.yahoo.ycsb.DB
   public void cleanup() throws DBException
   {
 	  client.printStats();
+	  System.out.printf("[INSERTKeyCount], Key Count Data\n");
+	  System.out.printf("[INSERTKeyCount], Key, keyCount\n");
+	  Iterator<String> it = DistinctkeyCount.keySet().iterator();
+	  
+	  while(it.hasNext()){
+		  String k = it.next();
+		  System.out.printf("[INSERTKeyCount], %s, %d\n",k,DistinctkeyCount.get(k));
+	  }
+	  
+	  System.out.printf("[INSERTKeyCountServer], Per Server Key Count\n");
+	  System.out.printf("[INSERTKeyCountServer], Host, key, keyCount\n");
+	  it = distinctKeyCountPerServer.keySet().iterator();
+	  
+	  while (it.hasNext()){
+		  String sname = it.next();
+		  Iterator<String> it2 = distinctKeyCountPerServer.get(sname).keySet().iterator();
+		  while (it2.hasNext()){
+			  String k2 = it2.next();
+			  
+			  ArrayList<Integer> is = distinctKeyCountPerServer.get(sname).get(k2);
+			  if (is != null){
+				  System.out.printf("[INSERTKeyCountServer], %s,%s,",sname,k2);
+				  for (Integer r : is){
+					  System.out.printf("%d,",r);
+				  }
+				  System.out.println();
+			  }
+		  }
+	  }
+	  
+	  System.out.printf("[READKeyCount], Key Count Data\n");
+	  System.out.printf("[READKeyCount], Key, keyCount\n");
+	   it = DistinctkeyCountR.keySet().iterator();
+	  
+	  while(it.hasNext()){
+		  String k = it.next();
+		  System.out.printf("[READKeyCount], %s, %d\n",k,DistinctkeyCountR.get(k));
+	  }
+	  
+	  System.out.printf("[READKeyCountServer], Per Server Key Count\n");
+	  System.out.printf("[READKeyCountServer], Host, key, keyCount\n");
+	  it = distinctKeyCountPerServerR.keySet().iterator();
+	  
+	  while (it.hasNext()){
+		  String sname = it.next();
+		  Iterator<String> it2 = distinctKeyCountPerServerR.get(sname).keySet().iterator();
+		  while (it2.hasNext()){
+			  String k2 = it2.next();
+			  ArrayList<Integer> is = distinctKeyCountPerServerR.get(sname).get(k2);
+			  if (is != null){
+				  System.out.printf("[READKeyCountServer], %s,%s,",sname,k2);
+				  for (Integer r : is){
+					  System.out.printf("%d,",r);
+				  }
+				  System.out.println();
+			  }
+		  }
+	  }
+	  
    client.shutdown();
   }
 
@@ -141,11 +211,12 @@ public int read(String table, String key, Set<String> fields,
     
     if (values == null){
     	Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), NOT_FOUND_V);
-    	return NOT_FOUND_V;
+    	return countReadKey(key,NOT_FOUND_V);
     }
     if (values.keySet().isEmpty()){
+    	
     	Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), NOT_FOUND_K);
-    	return NOT_FOUND_K;
+    	return countReadKey(key,NOT_FOUND_K);
     }
     if (fields == null) fields = values.keySet();
 
@@ -153,14 +224,61 @@ public int read(String table, String key, Set<String> fields,
       byte[] v = values.get(k);
       if (v == null){
     	  Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), NOT_FOUND_SV);
-    	  return NOT_FOUND_SV;
+    	  return countReadKey(key,NOT_FOUND_SV);
       }
       result.put(k, new ByteArrayByteIterator(v));
     }
     
-    Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), OK);
-    return OK;
+    Measurements.getMeasurements().reportReturnCode("Memcached:GET@"+client.getServerHostname(key), OK);    
+    return countReadKey(key,OK);
   }
+
+/**
+ * @param key
+ */
+private int countReadKey(String key,int status) {
+	Integer i = DistinctkeyCountR.get(key);
+	if (i == null){
+		DistinctkeyCountR.put(key, 1);
+	}
+	else{
+		DistinctkeyCountR.put(key, i+1);
+	}
+	
+	HashMap<String,ArrayList<Integer>> temp = distinctKeyCountPerServerR.get(client.getServerHostname(key));
+	
+	if (temp.get(key) == null){
+		ArrayList<Integer> retcodes = new ArrayList<Integer>();
+		retcodes.add(status);
+		temp.put(key, retcodes);
+	}
+	else{
+		temp.get(key).add(status);
+	}
+	return status;
+}
+
+private int countInsertKey(String key, int status) {
+	Integer i = DistinctkeyCount.get(key);
+	if (i == null){
+		DistinctkeyCount.put(key,1);
+	}
+	else{
+		DistinctkeyCount.put(key, i+1);
+	}
+	
+	HashMap<String,ArrayList<Integer>> temp = distinctKeyCountPerServer.get(client.getServerHostname(key));
+	
+	if (temp.get(key) == null){
+		ArrayList<Integer> retcodes = new ArrayList<Integer>();
+		retcodes.add(status);
+		temp.put(key, retcodes);
+	}
+	else{
+		temp.get(key).add(status);
+	}
+	return status;
+}
 
   /**
    * Perform a range scan for a set of records in the database. Each
@@ -193,18 +311,17 @@ public int read(String table, String key, Set<String> fields,
    * @return Zero on success, a non-zero error code on error.  See
    * this class's description for a discussion of error codes.
    */
+    
+  
   public int update(String table, String key,
                     HashMap<String,ByteIterator> values) {
     HashMap<String, byte[]> new_values = new HashMap<String, byte[]>();
-//   int sum = 0;
     for (String k: values.keySet()) {
       	
       byte[] vb = values.get(k).toArray();
       new_values.put(k, vb);
-//	  sum += vb.length;
 	  
     }
-//    System.out.println("Sum = "+sum);
     
 //    Measurements.getMeasurements().measure("DataSize", sum);
 //    Measurements.getMeasurements().measure("KeySize", key.getBytes().length);
@@ -218,13 +335,15 @@ public int read(String table, String key, Set<String> fields,
   	  client.updateStats(client.SET, key);	
     	Measurements.getMeasurements().measure("Memcached:SET@"+client.getServerHostname(key), (int)((en-st)/1000));
     	Measurements.getMeasurements().reportReturnCode("Memcached:SET@"+client.getServerHostname(key), res);
+    	countInsertKey(key,res);
+    	    	
     	return res; }
     catch (InterruptedException e) {
-    	Measurements.getMeasurements().reportReturnCode("Memcached:SET@"+client.getServerHostname(key), ERROR);
-    	return ERROR; }
+    	Measurements.getMeasurements().reportReturnCode("Memcached:SET@"+client.getServerHostname(key), ERROR_IE);
+    	return ERROR_IE; }
     catch (ExecutionException e) {
-    	Measurements.getMeasurements().reportReturnCode("Memcached:SET@"+client.getServerHostname(key), ERROR);
-    	return ERROR; }
+    	Measurements.getMeasurements().reportReturnCode("Memcached:SET@"+client.getServerHostname(key), ERROR_EE);
+    	return ERROR_EE; }
   }
 
   /**
