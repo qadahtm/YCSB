@@ -4,7 +4,7 @@ Memcached DB Layer Implementation.
 
 This work is done for the project component for ECE595 course at Purdue University. 
 
-We have extended the YCSB software to include a DB Layer for Memcached servers. This layer uses Spymemcached to 
+We have extended the YCSB software to include a DB Layer for Memcached servers. This DB layer uses Spymemcached to interact with the Memcached servers.
 
 
 Building Instructions:
