@@ -84,12 +84,6 @@ public class JdbcDBClient extends DB {
   private static final String DEFAULT_PROP = "";
   private ConcurrentMap<StatementType, PreparedStatement> cachedStatements;
   
-  private AtomicInteger txId = new AtomicInteger(0);
-  private AtomicInteger startCount = new AtomicInteger(0);
-  private AtomicInteger commitCount = new AtomicInteger(0);
-  private AtomicInteger readCount = new AtomicInteger(0);
-  private AtomicInteger updateCount = new AtomicInteger(0);
-
   /**
    * Ordered field information for insert and update statements.
    */
@@ -197,11 +191,6 @@ public class JdbcDBClient extends DB {
     super.start();
     try {
       conns.get(0).setAutoCommit(false);
-      int ctxId = txId.incrementAndGet();
-      int startc = startCount.incrementAndGet();
-      String out = String.format("START, txId = %d, theradId = %d , startCount = %d",
-          ctxId, Thread.currentThread().getId(), startc);
-      System.out.println(out);
     } catch (SQLException e) {
       e.printStackTrace();
       throw new DBException(e);
@@ -213,12 +202,6 @@ public class JdbcDBClient extends DB {
     super.commit();
     try {
       conns.get(0).commit();
-//      System.out.println(conns.size());
-      int ctxId = txId.get();
-      int commitc = commitCount.incrementAndGet();
-      String out =String.format("COMMIT, txId = %d, theradId = %d , commitCount = %d", 
-          ctxId, Thread.currentThread().getId(), commitc);
-      System.out.println(out);  
     } catch (SQLException e) {
       e.printStackTrace();
       throw new DBException(e);
@@ -230,7 +213,6 @@ public class JdbcDBClient extends DB {
     super.abort();
     try {
       conns.get(0).rollback();
-//      System.out.println("ABORT");
     } catch (SQLException e) {
       e.printStackTrace();
       throw new DBException(e);
@@ -439,11 +421,6 @@ public class JdbcDBClient extends DB {
       }
       readStatement.setString(1, key);
       
-      int ctxId = txId.get();
-      int readc = readCount.incrementAndGet();
-      String out =String.format("READ, txId = %d, theradId = %d , readCount = %d", 
-          ctxId, Thread.currentThread().getId(), readc);
-      System.out.println(out);
       ResultSet resultSet = readStatement.executeQuery();
       if (!resultSet.next()) {
         resultSet.close();
@@ -509,12 +486,6 @@ public class JdbcDBClient extends DB {
         updateStatement.setString(index++, value);
       }
       updateStatement.setString(index, key);
-      
-      int ctxId = txId.get();
-      int updatec = updateCount.incrementAndGet();
-      String out =String.format("UPDATE, txId = %d, theradId = %d , updateCount = %d", 
-          ctxId, Thread.currentThread().getId(), updatec);
-      System.out.println(out);
       
       int result = updateStatement.executeUpdate();
       if (result == 1) {
