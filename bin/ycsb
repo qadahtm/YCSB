@@ -66,6 +66,7 @@ DATABASES = {
     "hbase098"     : "com.yahoo.ycsb.db.HBaseClient",
     "hbase10"      : "com.yahoo.ycsb.db.HBaseClient10",
     "hypertable"   : "com.yahoo.ycsb.db.HypertableClient",
+    "ignite"       : "com.yahoo.ycsb.db.IgniteClient",
     "infinispan-cs": "com.yahoo.ycsb.db.InfinispanRemoteClient",
     "infinispan"   : "com.yahoo.ycsb.db.InfinispanClient",
     "jdbc"         : "com.yahoo.ycsb.db.JdbcDBClient",

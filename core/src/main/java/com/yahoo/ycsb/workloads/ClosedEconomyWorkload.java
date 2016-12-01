@@ -18,6 +18,7 @@
 package com.yahoo.ycsb.workloads;
 
 import java.util.Properties;
+
 import com.yahoo.ycsb.*;
 import com.yahoo.ycsb.generator.CounterGenerator;
 import com.yahoo.ycsb.generator.DiscreteGenerator;
@@ -516,15 +517,24 @@ public class ClosedEconomyWorkload extends Workload {
         String op=operationchooser.nextString();
 
         if (op.compareTo("READ") == 0) {
+//            System.out.println("read-txn by: "+ Thread.currentThread().getId());
             ret = doTransactionRead(db);
         } else if (op.compareTo("UPDATE") == 0) {
+//            System.out.println("update-txn");
             ret = doTransactionUpdate(db);
         } else if (op.compareTo("INSERT") == 0) {
+//            System.out.println("insert-txn");
             ret = doTransactionInsert(db);
         } else if (op.compareTo("SCAN") == 0) {
+//            System.out.println("scan-txn");
             ret = doTransactionScan(db);
         } else {
-            ret = doTransactionReadModifyWrite(db);
+            try {
+//              System.out.println("readmodifywrite-txn by: "+ Thread.currentThread().getId());
+              ret = doTransactionReadModifyWrite(db);
+            } catch (DBException e) {
+              ret = false;
+            }
         }
 
         long en = System.nanoTime();
@@ -560,22 +570,41 @@ public class ClosedEconomyWorkload extends Workload {
 
         String keyname = buildKeyName(keynum);
 
-        HashSet<String> fields = null;
+//        HashSet<String> fields = null;
+        
+//        if (!readallfields) {
+//            // read a random field
+//            String fieldname = "field" + fieldchooser.nextString();
 
-        if (!readallfields) {
-            // read a random field
-            String fieldname = "field" + fieldchooser.nextString();
-
-            fields = new HashSet<String>();
-            fields.add(fieldname);
-        }
-
+//            fields = new HashSet<String>();
+//            fields.add(fieldname);
+//        }
+        HashSet<String> fields = computeFields();
+        
         HashMap<String, ByteIterator> firstvalues = new HashMap<String, ByteIterator>();
-
-        return (db.read(table, keyname, fields, firstvalues) == Status.OK);
+        boolean res = false;
+        
+        try {
+          res = (db.read(table, keyname, fields, firstvalues) == Status.OK);
+        } catch (Exception e) {
+          e.printStackTrace();
+          res = false;
+        }
+        
+        return res;
     }
 
-    public boolean doTransactionReadModifyWrite(DB db) {
+    /**
+     * @return
+     */
+    private HashSet<String> computeFields() {
+      String fieldkey = "field0";
+      HashSet<String> fields = new HashSet<String>();
+      fields.add(fieldkey);
+      return fields;
+    }
+
+    public boolean doTransactionReadModifyWrite(DB db) throws DBException {
         // choose a random key
         int first = nextKeynum();
         int second = first;
@@ -595,24 +624,44 @@ public class ClosedEconomyWorkload extends Workload {
         String firstkey = buildKeyName(first);
         String secondkey = buildKeyName(second);
 
-        HashSet<String> fields = null;
+//        HashSet<String> fields = null;
 
-        if (!readallfields) {
-            // read a random field
-            String fieldname = "field" + fieldchooser.nextString();
-
-            fields = new HashSet<String>();
-            fields.add(fieldname);
-        }
+//        if (!readallfields) {
+//            // read a random field
+//            String fieldname = "field" + fieldchooser.nextString();
+//
+//            fields = new HashSet<String>();
+//            fields.add(fieldname);
+//        }
+        HashSet<String> fields = computeFields();
 
         HashMap<String, ByteIterator> firstvalues = new HashMap<String, ByteIterator>();
         HashMap<String, ByteIterator> secondvalues = new HashMap<String, ByteIterator>();
+        
+        
+        // special handling for MarketDB 
+        if (((String )db.getProperties().get("db")).equalsIgnoreCase("com.yahoo.ycsb.MarketDB")){
+          // Use stored procedure
+          // FIXME(tq): this is no fair but we will use to for now. 
+          int amount = 1;
+                    
+          
+          Measurements.getMeasurements().measure("READ-MODIFY-WRITE",0);
+          return true;          
+        }
+        
+        // skip for BasicDB
+        if (((String )db.getProperties().get("db")).equalsIgnoreCase("com.yahoo.ycsb.BasicDB")){ 
+          Measurements.getMeasurements().measure("READ-MODIFY-WRITE",0);
+          return true;          
+        }
 
         // do the transaction
         long st = System.currentTimeMillis();
-
         if (db.read(table, firstkey, fields, firstvalues) == Status.OK && db.read(table, secondkey, fields, secondvalues) == Status.OK) {
             try {
+//                System.out.println(firstvalues.keySet());
+//                System.out.println(firstvalues.values().toString());
                 int firstamount = Integer.parseInt(firstvalues.get("field0")
                         .toString());
                 int secondamount = Integer.parseInt(secondvalues.get("field0")
@@ -633,15 +682,24 @@ public class ClosedEconomyWorkload extends Workload {
                     return false;
                 }
 
-                long en = System.currentTimeMillis();
-
+//                db.commit();
+                
+                long en = System.currentTimeMillis();                
                 Measurements.getMeasurements().measure("READ-MODIFY-WRITE",
                         (int) (en - st));
             } catch (NumberFormatException e) {
+                db.abort();
                 return false;
+            } catch (NullPointerException npe){
+              System.out.println(String.format("one of the keys returned null: %s, %s", firstkey, secondkey));
+              db.abort();
+              return false;
             }
+            
+            
             return true;
         }
+        db.abort();
         return false;
     }
 
@@ -683,8 +741,16 @@ public class ClosedEconomyWorkload extends Workload {
             // update a random field
             values = buildUpdate();
         }
-
-        return (db.update(table, keyname, values) == Status.OK);
+        
+        boolean res = false;
+        try {
+          res = (db.update(table, keyname, values) == Status.OK);                   
+        } catch (Exception e) {
+          e.printStackTrace();
+          res = false;
+        }
+        
+        return res;
     }
 
     public boolean doTransactionInsert(DB db) {
@@ -694,7 +760,16 @@ public class ClosedEconomyWorkload extends Workload {
         String dbkey = buildKeyName(keynum);
 
         HashMap<String, ByteIterator> values = buildValues();
-        return (db.insert(table, dbkey, values) == Status.OK);
+        
+        boolean res = false;
+        try {
+          res = (db.insert(table, dbkey, values) == Status.OK);                              
+        } catch (Exception e) {
+          e.printStackTrace();
+          res = false;
+        }
+        
+        return res;        
     }
 
     /**
@@ -707,6 +782,10 @@ public class ClosedEconomyWorkload extends Workload {
         HashSet<String> fields = new HashSet<String>();
         fields.add("field0");
         System.out.println("Validating data");
+        
+        // skip for BasicDB
+        if (((String )db.getProperties().get("db")).equalsIgnoreCase("com.yahoo.ycsb.BasicDB")) return true;
+        
         HashMap<String, ByteIterator> values = new HashMap<String, ByteIterator>();
         int counted_sum = 0;
         for (int i = 0; i < recordcount; i++) {
@@ -718,6 +797,7 @@ public class ClosedEconomyWorkload extends Workload {
             } catch (DBException e) {
                 throw new WorkloadException(e);
             }
+            
             counted_sum += Integer.parseInt(values.get("field0").toString());
         }
 

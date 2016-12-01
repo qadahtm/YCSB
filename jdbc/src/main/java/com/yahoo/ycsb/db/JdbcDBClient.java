@@ -26,6 +26,7 @@ import java.sql.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A class that wraps a JDBC compliant database to allow it to be interfaced
@@ -82,6 +83,12 @@ public class JdbcDBClient extends DB {
   private Integer jdbcFetchSize;
   private static final String DEFAULT_PROP = "";
   private ConcurrentMap<StatementType, PreparedStatement> cachedStatements;
+  
+  private AtomicInteger txId = new AtomicInteger(0);
+  private AtomicInteger startCount = new AtomicInteger(0);
+  private AtomicInteger commitCount = new AtomicInteger(0);
+  private AtomicInteger readCount = new AtomicInteger(0);
+  private AtomicInteger updateCount = new AtomicInteger(0);
 
   /**
    * Ordered field information for insert and update statements.
@@ -190,6 +197,11 @@ public class JdbcDBClient extends DB {
     super.start();
     try {
       conns.get(0).setAutoCommit(false);
+      int ctxId = txId.incrementAndGet();
+      int startc = startCount.incrementAndGet();
+      String out = String.format("START, txId = %d, theradId = %d , startCount = %d",
+          ctxId, Thread.currentThread().getId(), startc);
+      System.out.println(out);
     } catch (SQLException e) {
       e.printStackTrace();
       throw new DBException(e);
@@ -201,6 +213,12 @@ public class JdbcDBClient extends DB {
     super.commit();
     try {
       conns.get(0).commit();
+//      System.out.println(conns.size());
+      int ctxId = txId.get();
+      int commitc = commitCount.incrementAndGet();
+      String out =String.format("COMMIT, txId = %d, theradId = %d , commitCount = %d", 
+          ctxId, Thread.currentThread().getId(), commitc);
+      System.out.println(out);  
     } catch (SQLException e) {
       e.printStackTrace();
       throw new DBException(e);
@@ -212,6 +230,7 @@ public class JdbcDBClient extends DB {
     super.abort();
     try {
       conns.get(0).rollback();
+//      System.out.println("ABORT");
     } catch (SQLException e) {
       e.printStackTrace();
       throw new DBException(e);
@@ -270,7 +289,8 @@ public class JdbcDBClient extends DB {
 
     String autoCommitStr = props.getProperty(JDBC_AUTO_COMMIT, Boolean.TRUE.toString());
     Boolean autoCommit = Boolean.parseBoolean(autoCommitStr);
-
+    System.out.println("Autocommit is "+autoCommit);
+    
     try {
       if (driver != null) {
         Class.forName(driver);
@@ -280,13 +300,16 @@ public class JdbcDBClient extends DB {
       for (String url : urls.split(",")) {
         System.out.println("Adding shard node URL: " + url);
         Connection conn = DriverManager.getConnection(url, user, passwd);
-
+        
+        // Ensure transaction serializability
+        conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+        
         // Since there is no explicit commit method in the DB interface, all
         // operations should auto commit, except when explicitly told not to
         // (this is necessary in cases such as for PostgreSQL when running a
         // scan workload with fetchSize)
         conn.setAutoCommit(autoCommit);
-
+        
         shardCount++;
         conns.add(conn);
       }
@@ -415,6 +438,12 @@ public class JdbcDBClient extends DB {
         readStatement = createAndCacheReadStatement(type, key);
       }
       readStatement.setString(1, key);
+      
+      int ctxId = txId.get();
+      int readc = readCount.incrementAndGet();
+      String out =String.format("READ, txId = %d, theradId = %d , readCount = %d", 
+          ctxId, Thread.currentThread().getId(), readc);
+      System.out.println(out);
       ResultSet resultSet = readStatement.executeQuery();
       if (!resultSet.next()) {
         resultSet.close();
@@ -480,6 +509,13 @@ public class JdbcDBClient extends DB {
         updateStatement.setString(index++, value);
       }
       updateStatement.setString(index, key);
+      
+      int ctxId = txId.get();
+      int updatec = updateCount.incrementAndGet();
+      String out =String.format("UPDATE, txId = %d, theradId = %d , updateCount = %d", 
+          ctxId, Thread.currentThread().getId(), updatec);
+      System.out.println(out);
+      
       int result = updateStatement.executeUpdate();
       if (result == 1) {
         return Status.OK;
@@ -540,7 +576,7 @@ public class JdbcDBClient extends DB {
 
   private OrderedFieldInfo getFieldInfo(HashMap<String, ByteIterator> values) {
     String fieldKeys = "";
-    List<String> fieldValues = new ArrayList();
+    List<String> fieldValues = new ArrayList<String>();
     int count = 0;
     for (Map.Entry<String, ByteIterator> entry : values.entrySet()) {
       fieldKeys += entry.getKey();
