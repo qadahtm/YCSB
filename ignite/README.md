@@ -17,23 +17,9 @@ LICENSE file.
 
 ## Quick Start
 
-This section describes how to run YCSB on MongoDB. 
+This section describes how to run YCSB on Apache Ignite. 
 
-### 1. Start MongoDB
-
-First, download MongoDB and start `mongod`. For example, to start MongoDB
-on x86-64 Linux box:
-
-    wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-x.x.x.tgz
-    tar xfvz mongodb-linux-x86_64-*.tgz
-    mkdir /tmp/mongodb
-    cd mongodb-linux-x86_64-*
-    ./bin/mongod --dbpath /tmp/mongodb
-
-Replace x.x.x above with the latest stable release version for MongoDB.
-See http://docs.mongodb.org/manual/installation/ for installation steps for various operating systems.
-
-### 2. Install Java and Maven
+### 1. Install Java and Maven
 
 Go to http://www.oracle.com/technetwork/java/javase/downloads/index.html
 
@@ -64,89 +50,38 @@ Reload bash and test mvn
     bash
     mvn -version
 
+### 2. Start Apache Ignite
+
+See https://apacheignite.readme.io/docs on how to deply Ignite. Sample configuration files can be found under the `config` folder
+
+Alternativly, you can start an ignite node using the ``` ServerNode``` and use the following command:
+```
+$ java -cp "./ignite/target/dependency/*:./ignite/target/ignite-binding-0.7.0-SNAPSHOT.jar" com.yahoo.ycsb.examples.ignite.ServerNode -t
+```
+
 ### 3. Set Up YCSB
 
-Download the YCSB zip file and compile:
+Clone the repo and build using the following command:
 
-    curl -O --location https://github.com/brianfrankcooper/YCSB/releases/download/0.5.0/ycsb-0.5.0.tar.gz
-    tar xfvz ycsb-0.5.0.tar.gz
-    cd ycsb-0.5.0
+```
+$ mvn clean package -DskipTests
+```
 
 ### 4. Run YCSB
 
-Now you are ready to run! First, use the asynchronous driver to load the data:
+You can run Ignite in two modes: `Transactional` and `Atomic`. You can use the parameter `ignite.txmode=true` to run the client in `Transactional` mode. The following command will run YCSB client with 8 threads using the ce_workload. 
 
-    ./bin/ycsb load mongodb-async -s -P workloads/workloada > outputLoad.txt
+```
+./bin/ycsb load ignite -P workloads/ce_workload -p ignite.cachename=testing -p ignite.txmode=true -threads 8 -p ignite.conffile=./ignite/config/example-ignite.xml
+```
 
-Then, run the workload:
+## Ignite Configuration Parameters
 
-    ./bin/ycsb run mongodb-async -s -P workloads/workloada > outputRun.txt
-    
-Similarly, to use the synchronous driver from MongoDB Inc. we load the data: 
+- `ignite.conffile`
+  - This should be a path to the configuration file for Ignite.
 
-    ./bin/ycsb load mongodb -s -P workloads/workloada > outputLoad.txt
+- `ignite.txmode`
+  - set to `true` to run in transactional mode
 
-Then, run the workload:
-
-    ./bin/ycsb run mongodb -s -P workloads/workloada > outputRun.txt
-    
-See the next section for the list of configuration parameters for MongoDB.
-
-## MongoDB Configuration Parameters
-
-- `mongodb.url`
-  - This should be a MongoDB URI or connection string. 
-    - See http://docs.mongodb.org/manual/reference/connection-string/ for the standard options.
-    - For the complete set of options for the asynchronous driver see: 
-      - http://www.allanbank.com/mongodb-async-driver/apidocs/index.html?com/allanbank/mongodb/MongoDbUri.html
-    - For the complete set of options for the synchronous driver see:
-      - http://api.mongodb.org/java/current/index.html?com/mongodb/MongoClientURI.html
-  - Default value is `mongodb://localhost:27017/ycsb?w=1`
-  - Default value of database is `ycsb`
-
-- `mongodb.batchsize`
-  - Useful for the insert workload as it will submit the inserts in batches inproving throughput.
-  - Default value is `1`.
-
-- `mongodb.upsert`
-  - Determines if the insert operation performs an update with the upsert operation or a insert. 
-    Upserts have the advantage that they will continue to work for a partially loaded data set.
-  - Setting to `true` uses updates, `false` uses insert operations.
-  - Default value is `false`.
-
-- `mongodb.writeConcern`
-  - **Deprecated** - Use the `w` and `journal` options on the MongoDB URI provided by the `mongodb.url`.
-  - Allowed values are :
-    - `errors_ignored`
-    - `unacknowledged`
-    - `acknowledged`
-    - `journaled`
-    - `replica_acknowledged`
-    - `majority`
-  - Default value is `acknowledged`.
- 
-- `mongodb.readPreference`
-  - **Deprecated** - Use the `readPreference` options on the MongoDB URI provided by the `mongodb.url`.
-  - Allowed values are :
-    - `primary`
-    - `primary_preferred`
-    - `secondary`
-    - `secondary_preferred`
-    - `nearest`
-  - Default value is `primary`.
- 
-- `mongodb.maxconnections`
-  - **Deprecated** - Use the `maxPoolSize` options on the MongoDB URI provided by the `mongodb.url`.
-  - Default value is `100`.
-
-- `mongodb.threadsAllowedToBlockForConnectionMultiplier`
-  - **Deprecated** - Use the `waitQueueMultiple` options on the MongoDB URI provided by the `mongodb.url`.
-  - Default value is `5`.
-
-For example:
-
-    ./bin/ycsb load mongodb-async -s -P workloads/workloada -p mongodb.url=mongodb://localhost:27017/ycsb?w=0
-
-To run with the synchronous driver from MongoDB Inc.:
-
-    ./bin/ycsb load mongodb -s -P workloads/workloada -p mongodb.url=mongodb://localhost:27017/ycsb?w=0
+- `ignite.cachename`
+  - The name for the cache to be used by the Ignite client.
