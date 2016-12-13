@@ -17,6 +17,8 @@
 
 package com.yahoo.ycsb.db;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +27,13 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.function.BiConsumer;
 import java.util.logging.Logger;
+
+import alluxio.AlluxioURI;
+import alluxio.client.marketdb.BaseMarketDBReaderWriter;
+import alluxio.exception.AlluxioException;
+import alluxio.exception.FileAlreadyExistsException;
+import alluxio.client.mkeyvalue.MuKeyValueSystem;
+import alluxio.client.mkeyvalue.MuKeyValueStore;
 
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.DB;
@@ -37,42 +46,70 @@ import com.yahoo.ycsb.StringByteIterator;
  *
  * @author qadahtm
  */
-public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedureExecutor {
+public class MarketDBClient extends DB implements
+    com.yahoo.ycsb.StoredProcedureExecutor {
 
-  private static final String CONF_FILE_PROPERTY = "ignite.conffile";
-  private static final String CACHE_NAME_PROPERTY = "ignite.cachename";
-
+  private static final String STORE_URI_PROPERTY = "marketdb.uri";
+  private static final String USE_STORAGE_LAYER_PROPERTY = "marketdb.mukv";
   private static final String KV_DEL = ":";
   private static final String ENTRY_DEL = ",";
-
   private final Logger log = Logger.getLogger(getClass().getName());
+
+  private BaseMarketDBReaderWriter db1;
+  private MuKeyValueStore mukv;
+  private MuKeyValueSystem kvs;
+  private boolean useMuKVstore = false;
 
   @Override
   public void init() throws DBException {
     Properties props = getProperties();
 
-    String confFile = props.getProperty(CONF_FILE_PROPERTY);
-    String cacheName = props.getProperty(CACHE_NAME_PROPERTY);
+    String storeUri = props.getProperty(STORE_URI_PROPERTY);
 
-    if (confFile == null) {
+    if (storeUri == null) {
       throw new DBException(String.format(
-          "Required property \"%s\" missing for IgniteClient",
-          CONF_FILE_PROPERTY));
+          "Required property \"%s\" missing for MarketDBClient",
+          STORE_URI_PROPERTY));
     }
 
-    if (cacheName == null) {
-      throw new DBException(String.format(
-          "Required property \"%s\" missing for IgniteClient",
-          CACHE_NAME_PROPERTY));
+    try {
+      useMuKVstore = Boolean.valueOf(props
+          .getProperty(USE_STORAGE_LAYER_PROPERTY));
+    } catch (Exception e) {
+      e.printStackTrace();
     }
 
-  
+    try {
+      if (useMuKVstore) {
+        kvs = MuKeyValueSystem.Factory.create();
+        try {
+          mukv = kvs.createStore(new AlluxioURI(storeUri));  
+        } catch (FileAlreadyExistsException e) {
+          try {
+            mukv = kvs.openStore(new AlluxioURI(storeUri));
+          } catch (Exception e2) {
+            throw new DBException("could not connect to database at "
+                + storeUri);
+          }
+        }
+        
+      } else {
+        db1 = new BaseMarketDBReaderWriter(new AlluxioURI(storeUri));
+      }
+
+      // System.out.println("Initialized a client for thread "
+      // + Thread.currentThread().getId());
+    } catch (IOException e) {
+      e.printStackTrace();
+    } catch (AlluxioException e) {
+      e.printStackTrace();
+    }
+
   }
 
   @Override
   public void cleanup() throws DBException {
-
-
+    
   }
 
   /*
@@ -82,7 +119,7 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
    */
   @Override
   public void start() throws DBException {
-    
+
     super.start();
   }
 
@@ -114,7 +151,15 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
     try {
       // need to serialize values
       String svalue = stringify(values);
-//      db.put(formatKey(table, key), svalue);
+      // System.out.println(formatKey(table, key));
+      // System.out.println(svalue);
+      if (useMuKVstore) {
+        mukv.put(ByteBuffer.wrap(formatKey(table, key).getBytes()),
+            ByteBuffer.wrap(svalue.getBytes()));
+      } else {
+        db1.put(formatKey(table, key).getBytes(), svalue.getBytes());
+      }
+
       return Status.OK;
     } catch (Exception e) {
       e.printStackTrace();
@@ -141,7 +186,9 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
 
       @Override
       public void accept(String t, String u) {
-        slist.add(t + kvDelimiter + u);
+        String mt = t.replace(',', ';');
+        String mu = u.replace(',', ';');
+        slist.add(mt + kvDelimiter + mu);
       }
 
     });
@@ -162,7 +209,7 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
   @Override
   public Status delete(String table, String key) {
     try {
-//      boolean res = db.remove(formatKey(table, key));
+      // boolean res = db.remove(formatKey(table, key));
       // TODO: what if res == false???
       return Status.OK;
     } catch (Exception e) {
@@ -177,8 +224,14 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
     try {
       String dbkey = formatKey(table, key);
       HashMap<String, String> values = new HashMap<String, String>();
-//      String svalue = db.get(dbkey);
-//      values = deStringfyValue(fields, svalue);
+      String svalue = null;
+      if (useMuKVstore) {
+        mukv.get(ByteBuffer.wrap(dbkey.getBytes()));
+      } else {
+        svalue = new String(db1.get(dbkey.getBytes()));
+      }
+
+      values = deStringfyValue(fields, svalue);
 
       StringByteIterator.putAllAsByteIterators(result, values);
       return Status.OK;
@@ -195,10 +248,13 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
    * @param svalue
    */
   public static HashMap<String, String> deStringfyValue(Set<String> fields,
-       String svalue) {
+      String svalue) {
+    if (svalue == null) {
+      return new HashMap<String, String>();
+    }
     String[] svalues = svalue.split(ENTRY_DEL);
     HashMap<String, String> values = new HashMap<String, String>();
-    
+
     for (int i = 0; i < svalues.length; i++) {
       String[] kv = svalues[i].split(KV_DEL);
       if (fields == null || fields.isEmpty()) {
@@ -211,7 +267,7 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
 
       }
     }
-    
+
     return values;
   }
 
@@ -220,7 +276,12 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
       HashMap<String, ByteIterator> values) {
     try {
       String svalue = stringify(values);
-//      db.put(formatKey(table, key), svalue);
+      if (useMuKVstore) {
+        mukv.put(ByteBuffer.wrap(formatKey(table, key).getBytes()),
+            ByteBuffer.wrap(svalue.getBytes()));
+      } else {
+        db1.put(formatKey(table, key).getBytes(), svalue.getBytes());
+      }
       return Status.OK;
     } catch (Exception e) {
       e.printStackTrace();
@@ -231,18 +292,20 @@ public class MarketDBClient extends DB implements com.yahoo.ycsb.StoredProcedure
   @Override
   public Status scan(String table, String startkey, int recordcount,
       Set<String> fields, Vector<HashMap<String, ByteIterator>> result) {
-    // this will ignore the startkey and reads the number of records specified by recordcount
-//    
-//    Iterator<Entry<String, String>> iter = db.iterator();
-//    
-//    while (iter.hasNext() && recordcount > 0){
-//      recordcount--;
-//      Entry<String, String> rec = iter.next();
-//      String svalue = rec.getValue();
-//      HashMap<String, ByteIterator> val = StringByteIterator.getByteIteratorMap((deStringfyValue(fields, svalue)));
-//      result.add(val);
-//    }
-//    
+    // this will ignore the startkey and reads the number of records specified
+    // by recordcount
+    //
+    // Iterator<Entry<String, String>> iter = db.iterator();
+    //
+    // while (iter.hasNext() && recordcount > 0){
+    // recordcount--;
+    // Entry<String, String> rec = iter.next();
+    // String svalue = rec.getValue();
+    // HashMap<String, ByteIterator> val =
+    // StringByteIterator.getByteIteratorMap((deStringfyValue(fields, svalue)));
+    // result.add(val);
+    // }
+    //
     return Status.OK;
   }
 

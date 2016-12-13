@@ -310,19 +310,13 @@ class ClientThread extends Thread
     // and the client thread have the same view on time.
 
 		//spread the thread operations out so they don't all hit the DB at the same time
-		try
-		{
-		   //GH issue 4 - throws exception if _target>1 because random.nextInt argument must be >0
-		   //and the sleep() doesn't make sense for granularities < 1 ms anyway
-		   if ( (_targetOpsPerMs>0) && (_targetOpsPerMs<=1.0) ) 
-		   {
-		      sleep(Utils.random().nextInt((int)(1.0/_targetOpsTickNs)));
-		   }
-		}
-		catch (InterruptedException e)
-		{
-		  // do nothing.
-		}
+                //GH issue 4 - throws exception if _target>1 because random.nextInt argument must be >0
+                //and the sleep() doesn't make sense for granularities < 1 ms anyway
+                if ((_targetOpsPerMs > 0) && (_targetOpsPerMs <= 1.0))
+                 {
+                   long randomMinorDelay = Utils.random().nextInt((int) _targetOpsTickNs);
+                   sleepUntil(System.nanoTime() + randomMinorDelay);
+                 }
 		
 		try
 		{

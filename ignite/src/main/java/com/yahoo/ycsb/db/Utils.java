@@ -83,6 +83,9 @@ public final class Utils {
    */
   public static HashMap<String, String> deStringfyValue(Set<String> fields,
        String svalue) {
+    if (svalue == null) {
+      return new HashMap<String, String>();
+    }
     String[] svalues = svalue.split(ENTRY_DEL);
     HashMap<String, String> values = new HashMap<String, String>();
     
