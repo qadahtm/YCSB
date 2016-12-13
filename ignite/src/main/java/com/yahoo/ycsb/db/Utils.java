@@ -58,7 +58,9 @@ public final class Utils {
 
       @Override
       public void accept(String t, String u) {
-        slist.add(t + kvDelimiter + u);
+        String mt = t.replace(',', ';');
+        String mu = u.replace(',', ';');
+        slist.add(mt + kvDelimiter + mu);
       }
 
     });
@@ -87,6 +89,8 @@ public final class Utils {
       return new HashMap<String, String>();
     }
     String[] svalues = svalue.split(ENTRY_DEL);
+    
+    System.out.println(svalue);
     HashMap<String, String> values = new HashMap<String, String>();
     
     for (int i = 0; i < svalues.length; i++) {
