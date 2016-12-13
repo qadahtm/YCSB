@@ -120,7 +120,7 @@ LICENSE file.
     <module>jdbc</module>
     <module>kudu</module>
     <!--<module>mapkeeper</module>-->
-    <module>marketdb</module>
+    <!--<module>marketdb</module>-->
     <module>memcached</module>
     <module>mongodb</module>
     <module>nosqldb</module>
