@@ -31,6 +31,7 @@ import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.configuration.CacheConfiguration;
+import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.transactions.Transaction;
 
 import com.yahoo.ycsb.ByteIterator;
@@ -90,7 +91,7 @@ public class IgniteClient extends DB {
 //      cacheCfg.setAtomicityMode(CacheAtomicityMode.ATOMIC);
 //    }
 //
-//    IgniteConfiguration cfg = new IgniteConfiguration();
+    IgniteConfiguration cfg = Ignition.loadSpringBean(confFile, "ignite.cfg");
 //
 //    cfg.setCacheConfiguration(cacheCfg);
 //    cfg.setPeerClassLoadingEnabled(false);
@@ -102,8 +103,9 @@ public class IgniteClient extends DB {
 //    cfg.setClientMode(true);
 
     // create ignite client
-    ignite = Ignition.start(confFile);
-
+    
+    ignite = Ignition.getOrStart(cfg);
+    
     db = ignite.getOrCreateCache(cacheName);
 
     int c = threadCount.incrementAndGet();
