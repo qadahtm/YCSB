@@ -30,10 +30,7 @@ import javax.cache.Cache.Entry;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.Ignition;
-import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.configuration.CacheConfiguration;
-import org.apache.ignite.configuration.IgniteConfiguration;
-import org.apache.ignite.configuration.TransactionConfiguration;
 import org.apache.ignite.transactions.Transaction;
 
 import com.yahoo.ycsb.ByteIterator;
@@ -85,29 +82,27 @@ public class IgniteClient extends DB {
           CACHE_NAME_PROPERTY));
     }
 
-    cacheCfg = new CacheConfiguration<String, String>(confFile);
+    cacheCfg = new CacheConfiguration<String, String>(cacheName);
 
-    cacheCfg.setName(cacheName);
-
-    if (transactional) {
-      cacheCfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);      
-    } else {
-      cacheCfg.setAtomicityMode(CacheAtomicityMode.ATOMIC);
-    }
-
-    IgniteConfiguration cfg = new IgniteConfiguration();
-
-    cfg.setCacheConfiguration(cacheCfg);
-    cfg.setPeerClassLoadingEnabled(false);
+//    if (transactional) {
+//      cacheCfg.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);      
+//    } else {
+//      cacheCfg.setAtomicityMode(CacheAtomicityMode.ATOMIC);
+//    }
+//
+//    IgniteConfiguration cfg = new IgniteConfiguration();
+//
+//    cfg.setCacheConfiguration(cacheCfg);
+//    cfg.setPeerClassLoadingEnabled(false);
 
     // Optional transaction configuration. Configure TM lookup here.
-    TransactionConfiguration txCfg = new TransactionConfiguration();
-
-    cfg.setTransactionConfiguration(txCfg);
-    cfg.setClientMode(true);
+//    TransactionConfiguration txCfg = new TransactionConfiguration();
+//
+//    cfg.setTransactionConfiguration(txCfg);
+//    cfg.setClientMode(true);
 
     // create ignite client
-    ignite = Ignition.getOrStart(cfg);
+    ignite = Ignition.start(confFile);
 
     db = ignite.getOrCreateCache(cacheName);
 
