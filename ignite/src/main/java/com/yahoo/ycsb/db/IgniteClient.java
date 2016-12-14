@@ -117,10 +117,10 @@ public class IgniteClient extends DB {
   public void cleanup() throws DBException {
     if (ignite != null) {
       int c = threadCount.get();
-      System.out.println("thread count = " + c);
+//      System.out.println("thread count = " + c);
       System.out.println("cleaning up");
       c = threadCount.decrementAndGet();
-      System.out.println("new thread count = " + c);
+//      System.out.println("new thread count = " + c);
       if (c == 0) {
         System.out.println("all threads are cleaning up, closing ignite " + c);
         ignite.close();

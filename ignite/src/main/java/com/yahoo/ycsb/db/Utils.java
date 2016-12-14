@@ -90,7 +90,6 @@ public final class Utils {
     }
     String[] svalues = svalue.split(ENTRY_DEL);
     
-    System.out.println(svalue);
     HashMap<String, String> values = new HashMap<String, String>();
     
     for (int i = 0; i < svalues.length; i++) {
